@@ -1,0 +1,55 @@
+---
+# defaults file for acmesh
+
+acmesh_state: present  # present, updated
+acmesh_version: latest  # latest, <tag>, master
+acmesh_configure: on_install  # always, on_install
+
+acmesh_user: acmesh
+# acmesh_user_home: e.g. /usr/lib/acmesh
+acmesh_install_root: ~/acmesh
+acmesh_scripts_dir: scripts
+acmesh_cert_dir: /etc/acme-certs
+acmesh_challange_dir: /var/www/acme-challange
+# acmesh_cert_dir_rights:
+#   group: www-data
+#   mode: '02750'
+acmesh_certs_mode:
+  dirs: '750'
+  files: '640'
+
+acmesh_default_ca: letsencrypt
+acmesh_default_chain:
+  - server: letsencrypt
+    chain: ISRG
+
+acmesh_cron_state: present  # present, absent
+acmesh_cron_hour: '3'
+acmesh_cron_minute: '40'
+acmesh_cron_weekday: '0,3'
+# acmesh_cron_day: '*'
+
+acmesh_bash_aliases: present  # present, absent
+
+acmesh_keylength_rsa: '4096'
+acmesh_keylength_ecc: 'ec-384'
+
+acmesh_default_cert_test: no
+acmesh_ignore_cert_errors: yes
+
+acmesh_certs: []
+# acmesh_certs:
+#   - domains:
+#       - dummy.example.com
+#       - www.dummy.example.com
+#     state: issued
+#     type: rsa
+#     server: letsencrypt
+#     test: yes
+#     force: no
+#   - domains:
+#       - james.example.com
+#       - www.james.example.com
+#     state: issued
+#     test: yes
+#     keylength: "ec-384"

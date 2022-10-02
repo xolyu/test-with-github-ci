@@ -1,0 +1,138 @@
+---
+
+- name: acme-sh install procedure
+  become: true
+  become_user: "{{ acmesh_user }}"
+  block:
+    - name: Query acme-sh version.
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: "{{ acmesh_cmd_base }} --version"
+      changed_when: false
+      register: _result_acmesh_version
+      when: _acmesh_is_installed
+
+    - name: Define _acmesh_installed_version.
+      set_fact:
+        _acmesh_installed_version: >-
+          {{ _result_acmesh_version.stdout | default('')
+          | regex_search('(\d+\.\d+\.\d+)') | default('0', true) }}
+
+    - name: Define _acmesh_update_is_required and _acmesh_zipball_url (for latest release).
+      set_fact:
+        _acmesh_update_is_required: >-
+          {{ _acmesh_latest_version is version(_acmesh_installed_version, '>') }}
+        _acmesh_zipball_url: >-
+          {{ ( lookup('url', 'https://api.github.com/repos/acmesh-official/acme.sh/releases/latest')
+          | from_json ).zipball_url | default('') }}
+      vars:
+        _acmesh_latest_version: >-
+          {{ ( lookup('url', 'https://api.github.com/repos/acmesh-official/acme.sh/releases/latest')
+          | from_json ).tag_name | default('') | regex_search('(\d+\.\d+\.\d+)')
+          | default('999', true) }}
+      when: acmesh_version == 'latest'
+
+    - name: Define _acmesh_update_is_required and _acmesh_zipball_url (for master branch).
+      set_fact:
+        _acmesh_update_is_required: yes
+        _acmesh_zipball_url: >-
+          https://github.com/acmesh-official/acme.sh/archive/master.zip
+      when: acmesh_version == 'master'
+
+    - name: Define _acmesh_update_is_required and _acmesh_zipball_url (for specific tag).
+      set_fact:
+        _acmesh_update_is_required: >-
+          {{ _acmesh_tag_version is version(_acmesh_installed_version, '!=') }}
+        _acmesh_zipball_url: >-
+          https://api.github.com/repos/acmesh-official/acme.sh/zipball/refs/tags/{{ acmesh_version }}
+      vars:
+        _acmesh_tag_version: >-
+          {{ acmesh_version | regex_search('(\d+\.\d+\.\d+)') | default('0', true) }}
+      when: acmesh_version not in ['latest', 'master']
+
+    - name: Installation or Update required
+      block:
+        - name: Create temp directory for download.
+          tempfile:
+            state: directory
+            suffix: ".acmesh"
+          register: _acmesh_tempdir
+
+        - name: Download acme-sh archive.
+          get_url:
+            url: "{{ _acmesh_zipball_url }}"
+            dest: "{{ (_acmesh_tempdir.path, 'acmesh.zip') | path_join }}"
+            mode: 0640
+
+        - name: Extract acme-sh archive.
+          unarchive:
+            src: "{{ (_acmesh_tempdir.path, 'acmesh.zip') | path_join }}"
+            dest: "{{ _acmesh_tempdir.path }}"
+            remote_src: yes
+
+        - name: Find extracted directory.
+          find:
+            path: "{{ _acmesh_tempdir.path }}"
+            file_type: directory
+            patterns: ['acme*']
+          register: _result_acmesh_unadir
+
+        - name: Determine that exactly 1 dir was found.
+          assert:
+            that: _result_acmesh_unadir.matched == 1
+
+        - name: Remove old files from acme-sh if present.
+          file:
+            path: "{{ (acmesh_install_root, item) | path_join }}"
+            state: absent
+          with_items: "{{ _acmesh_install_files }}"
+
+        - name: Install acme-sh.
+          command:
+            chdir: "{{ _result_acmesh_unadir.files.0.path }}"
+            cmd: >-
+              ./acme.sh --install
+              --home {{ acmesh_install_root }}
+              --config-home {{ (acmesh_install_root, _acmesh_config_dir) | path_join }}
+              --cert-home {{ acmesh_cert_dir }}
+              --noprofile --nocron
+          register: _acmesh_install_task
+
+        - name: Query acme-sh version.
+          command:
+            chdir: "{{ acmesh_user_home }}"
+            cmd: "{{ acmesh_cmd_base }} --version"
+          changed_when: false
+          register: _result_acmesh_version
+
+        - name: Print acme-sh version after install.
+          debug:
+            msg: "Present acme.sh version after installation: {{ acmesh_vers }}"
+          vars:
+            acmesh_vers: >-
+              {{ _result_acmesh_version.stdout | regex_search('(\d+\.\d+\.\d+)') | default('not found', true) }}
+
+      when: not _acmesh_is_installed or _acmesh_update_is_required
+
+    - name: Create scripts directory.
+      file:
+        path: "{{ acmesh_scripts_dir }}"
+        state: directory
+        mode: 0770
+
+    - name: Template scripts.
+      template:
+        src: "{{ item }}.j2"
+        dest: "{{ (acmesh_scripts_dir, item) | path_join }}"
+        mode: 0755
+      with_items:
+        - certs-fix-permissions.sh
+
+  always:
+    - name: Remove temporary directory.
+      file:
+        path: "{{ _acmesh_tempdir.path }}"
+        state: absent
+      when:
+        - _acmesh_tempdir is defined
+        - _acmesh_tempdir.path is defined

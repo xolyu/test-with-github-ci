@@ -1,0 +1,46 @@
+---
+
+- name: acme-sh default Chain procedure
+  become: true
+  become_user: "{{ acmesh_user }}"
+  block:
+
+    - name: "Check if CA conf for server {{ _acmesh_conf_chain.server | default('') }} exists."
+      stat:
+        path: >-
+          {{ (acmesh_install_root, _acmesh_config_dir,
+          'ca', server_dir, 'ca.conf') | path_join }}
+      vars:
+        server_dir: >-
+          {{ _acmesh_server_shortnames[_acmesh_conf_chain.server] | default(_acmesh_conf_chain.server)
+          | regex_search('^https://([\w\-\./]+)', '\1') | list | first | default('unknown', true) }}
+      register: _result_acmesh_ca_conf
+
+    - name: Slurp from CA conf for CA server.
+      slurp:
+        src: "{{ _result_acmesh_ca_conf.stat.path }}"
+      register: _result_slurp
+      when: _result_acmesh_ca_conf.stat.exists
+
+    - name: Find value of DEFAULT_PREFERRED_CHAIN.
+      set_fact:
+        _acmesh_configured_default_chain: >-
+          {{ _result_slurp.content | default('') | b64decode
+          | regex_findall(findre, multiline=True, ignorecase=True) | list | first | default('') }}
+      vars:
+        findre: '^DEFAULT_PREFERRED_CHAIN=''(.*)''$'
+      when: _result_acmesh_ca_conf.stat.exists
+
+    - name: "Set default Chain for server {{ _acmesh_conf_chain.server | default('') }}."
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: >-
+          {{ acmesh_cmd_base }} --set-default-chain
+          --server {{ _acmesh_conf_chain.server }}
+          --preferred-chain "{{ _acmesh_conf_chain.chain }}"
+      when:
+        - _acmesh_conf_chain.server is defined
+        - _acmesh_conf_chain.chain is defined
+        - _acmesh_configured_default_chain is not defined or
+          (_acmesh_configured_default_chain | lower) != (_acmesh_conf_chain.chain | lower)
+      register: _result_2

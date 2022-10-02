@@ -1,0 +1,79 @@
+---
+
+# Input Variable: _acmesh_cert
+
+- name: Define _acmesh_crt.
+  set_fact:
+    _acmesh_crt:
+      domains: "{{ [_acmesh_cert.domains] | flatten | unique }}"
+      state: >-
+        {{ _acmesh_cert.state
+          if ( _acmesh_cert.state | default('') ) in _acmesh_cert_states
+          else 'issued' }}
+      type: >-
+        {%- if _acmesh_cert.keylength is defined -%}
+        {{ _acmesh_cert.keylength | regex_search('^ec-') is not none | ternary('ecc', 'rsa') }}
+        {%- else -%}
+        {{ _acmesh_cert.type
+          if ( _acmesh_cert.type | default('') ) in _acmesh_cert_types
+          else 'rsa' }}
+        {%- endif -%}
+      force: "{{ _acmesh_cert.force | default(false) }}"
+      test: "{{ _acmesh_cert.test | default(acmesh_default_cert_test) }}"
+      server: "{{ _acmesh_cert.server | default(omit) }}"
+      keylength: "{{ _acmesh_cert.keylength | default(omit) }}"
+
+- name: Define _acmesh_crt_type_list.
+  set_fact:
+    _acmesh_crt_type_list: "{{ _acmesh_cert_types_list[_acmesh_crt.type] | default([]) }}"
+
+- name: Define _acmesh_crt_keylength_list.
+  set_fact:
+    _acmesh_crt_keylength_list: "{{ [_acmesh_crt.keylength] }}"
+  when: _acmesh_crt.keylength is defined
+
+- name: Define _acmesh_crt_keylength_list.
+  set_fact:
+    _acmesh_crt_keylength_list: "{{ _acmesh_crt_type_list | map('extract', keylength_default) }}"
+  vars:
+    keylength_default:
+      rsa: "{{ acmesh_keylength_rsa }}"
+      ecc: "{{ acmesh_keylength_ecc }}"
+  when: _acmesh_crt.keylength is not defined
+
+# Usage Variables: _acmesh_crt, _acmesh_crt_type_list, _acmesh_crt_keylength_list
+
+- name: Check cert dir existance.
+  stat:
+    path: "{{ (acmesh_cert_dir, _acmesh_dir_by_cert_type[item]
+      | regex_replace('##DOMAIN##', _acmesh_crt.domains.0) ) | path_join }}"
+  with_items: "{{ _acmesh_crt_type_list }}"
+  register: _result_crt_dir_stat
+
+- name: Define _acmesh_crt_dir_stat.
+  set_fact:
+    _acmesh_crt_dir_stat: "{{ _result_crt_dir_stat.results | items2dict(key_name='item', value_name='stat') }}"
+
+- name: Check cert dir content.
+  find:
+    path: "{{ (acmesh_cert_dir, _acmesh_dir_by_cert_type[item]
+      | regex_replace('##DOMAIN##', _acmesh_crt.domains.0) ) | path_join }}"
+  with_items: "{{ _acmesh_crt_type_list }}"
+  register: _result_crt_dir_content
+
+- name: Define _acmesh_crt_dir_content.
+  set_fact:
+    _acmesh_crt_dir_content: "{{ _acmesh_crt_dir_content | default({}) | combine(new_item | items2dict) }}"
+  vars:
+    contents: "{{ _result_crt_dir_content.results | items2dict(key_name='item', value_name='files') }}"
+    files: "{{ contents[item] | map(attribute='path') | map('basename') }}"
+    generics: "{{ files | map('regex_replace', '^'~_acmesh_crt.domains.0) }}"
+    new_item:
+      - key: "{{ item }}"
+        value:
+          files: "{{ files }}"
+          generics: "{{ generics }}"
+  with_items: "{{ _acmesh_crt_type_list }}"
+
+- name: Include state specific cert task
+  include_tasks: "51_cert_{{ _acmesh_crt.state }}.yml"

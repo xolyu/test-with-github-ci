@@ -1,0 +1,73 @@
+---
+
+- name: acme-sh default CA procedure
+  become: true
+  become_user: "{{ acmesh_user }}"
+  block:
+    - name: Query acme-sh info.
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: >-
+          {{ acmesh_cmd_base }} --info
+      changed_when: false
+      register: _result_acmesh_info
+
+    - name: Find value of DEFAULT_ACME_SERVER.
+      set_fact:
+        _acmesh_configured_default_ca: >-
+          {{ _result_acmesh_info.stdout | regex_findall(findre, multiline=True, ignorecase=True)
+          | list | first | default('__unconfigured__', true) }}
+      vars:
+        findre: '^DEFAULT_ACME_SERVER=''(.*)''$'
+
+    - name: Set acme-sh default CA.
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: >-
+          {{ acmesh_cmd_base }} --set-default-ca
+          --server {{ acmesh_default_ca }}
+      when: >-
+        _acmesh_configured_default_ca is none or _acmesh_configured_default_ca == '__unconfigured__'
+        or
+        ( acmesh_default_ca in _acmesh_server_shortnames and
+        _acmesh_configured_default_ca not in _acmesh_server_shortnames[acmesh_default_ca] )
+        or
+        ( acmesh_default_ca not in _acmesh_server_shortnames and
+        acmesh_default_ca != _acmesh_configured_default_ca )
+
+  when: acmesh_default_ca is defined
+
+- name: Include configure default Chain tasks.
+  include_tasks: 21_conf_chain.yml
+  loop: "{{ acmesh_default_chain }}"
+  loop_control:
+    loop_var: _acmesh_conf_chain
+  when: acmesh_default_chain is defined
+
+- name: Cronjob for certificate renewal.
+  cron:
+    name: Renew certificats with acme-sh
+    state: "{{ (acmesh_cron_state == 'absent') | ternary('absent', 'present') }}"
+    user: "{{ acmesh_user }}"
+    job: >-
+      {{ acmesh_cmd_base }} --renew-all
+    hour: "{{ acmesh_cron_hour | default(omit, true) }}"
+    minute: "{{ acmesh_cron_minute | default('0', true) }}"
+    weekday: "{{ acmesh_cron_weekday | default(omit, true) }}"
+    day: "{{ acmesh_cron_day | default(omit, true) }}"
+
+- name: Make Bash Aliases present.
+  become: true
+  become_user: "{{ acmesh_user }}"
+  lineinfile:
+    path: "{{ (acmesh_user_home, '.bash_aliases') | path_join }}"
+    state: "{{ (acmesh_bash_aliases == 'absent') | ternary('absent', 'present') }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    create: yes
+    mode: 0644
+  with_items:
+    - regexp: '^alias acmesh='
+      line: "alias acmesh='{{ acmesh_cmd_base }}'"
+    - regexp: '^alias acmesh-issue='
+      line: "alias acmesh-issue='{{ acmesh_cmd_base }} --issue --webroot {{ acmesh_challange_dir }}'"

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+find {{ (acmesh_cert_dir, '*') | path_join }} -type d -exec chmod {{ acmesh_certs_mode.dirs }} {} \;
+find {{ (acmesh_cert_dir, '*') | path_join }} -type f -exec chmod {{ acmesh_certs_mode.files }} {} \;

@@ -1,0 +1,88 @@
+---
+# tasks file for acmesh
+
+- name: Create user for acme-sh.
+  user:
+    name: "{{ acmesh_user }}"
+    home: "{{ acmesh_user_home | default(omit) }}"
+    shell: "/usr/sbin/nologin"
+  register: _result_acmesh_user
+
+- name: Define acmesh_user_home.
+  set_fact:
+    acmesh_user_home: "{{ _result_acmesh_user.home }}"
+
+- name: Redefine acmesh_install_root, to expand userhome.
+  set_fact:
+    acmesh_install_root: "{{ (acmesh_user_home, dir_relative ) | path_join }}"
+  vars:
+    dir_relative: "{{ acmesh_install_root | regex_replace('^~/(.+)', '\\1') }}"
+  when: acmesh_install_root | regex_search('^~/') is not none
+
+- name: Redefine acmesh_scripts_dir, to make absolute path.
+  set_fact:
+    acmesh_scripts_dir: "{{ (prefix, dir_relative ) | path_join }}"
+  vars:
+    prefix: "{{ acmesh_user_home if (acmesh_scripts_dir | regex_search('^~/') is not none)
+      else acmesh_install_root }}"
+    dir_relative: "{{ acmesh_scripts_dir | regex_replace('^(?:~/)?(.+)', '\\1') }}"
+  when: acmesh_scripts_dir | regex_search('^[^/]') is not none
+
+- name: Create Certificate directory.
+  file:
+    path: "{{ acmesh_cert_dir }}"
+    state: directory
+    owner: "{{ acmesh_user }}"
+    group: "{{ acmesh_cert_dir_rights.group | default(acmesh_user) }}"
+    mode: "{{ acmesh_cert_dir_rights.mode | default('0750') }}"
+
+- name: Check acme-sh install root.
+  find:
+    path: "{{ acmesh_install_root }}"
+    file_type: file
+    patterns: ['acme.sh']
+  register: _result_acmesh_installation
+
+- name: Define _acmesh_is_installed.
+  set_fact:
+    _acmesh_is_installed: "{{ _result_acmesh_installation.matched > 0 }}"
+
+- name: Define _acmesh_exec.
+  set_fact:
+    _acmesh_exec: "{{ (acmesh_install_root, 'acme.sh') | path_join }}"
+
+- name: Define acmesh_cmd_base.
+  set_fact:
+    acmesh_cmd_base: >-
+      {{ _acmesh_exec }}
+      --home {{ acmesh_install_root }}
+      --config-home {{ (acmesh_install_root, _acmesh_config_dir) | path_join }}
+
+- name: Include install tasks.
+  include_tasks: 10_install.yml
+  when: not _acmesh_is_installed or acmesh_state == 'updated'
+
+- name: Query stat for acme.sh script.
+  stat:
+    path: "{{ _acmesh_exec }}"
+  register: _acmesh_exec_stat
+
+- name: Ensure acme.sh script exists.
+  assert:
+    that: _acmesh_exec_stat.stat.exists
+    fail_msg: "acme.sh script is missing! Not found at expectet path: {{ _acmesh_exec }}"
+
+- name: Include configure tasks.
+  include_tasks: 20_configure.yml
+  when: >
+    ( acmesh_configure == 'always' ) or
+    ( acmesh_configure == 'on_install' and _acmesh_install_task is defined and _acmesh_install_task is changed )
+
+- name: Include cert tasks.
+  include_tasks: 50_cert.yml
+  when:
+    - _acmesh_cert.domains is defined and _acmesh_cert.domains.0 is defined
+  loop: "{{ acmesh_certs }}"
+  loop_control:
+    loop_var: _acmesh_cert
+    label: "{{ _acmesh_cert.domains.0 }}"

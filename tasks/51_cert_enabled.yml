@@ -1,0 +1,22 @@
+---
+
+- name: Enable certificate.
+  become: true
+  become_user: "{{ acmesh_user }}"
+  command:
+    chdir: "{{ acmesh_user_home }}"
+    cmd: "mv {{ src }} {{ dest }}"
+  args:
+    removes: "{{ src }}"
+    creates: "{{ dest }}"
+  vars:
+    dest: "{{ (_acmesh_crt_dir_stat[item].path, _acmesh_crt.domains.0 ~ '.conf' ) | path_join }}"
+    src: "{{ dest }}.removed"
+    generics_in_dir: "{{ _acmesh_crt_dir_content[item].generics }}"
+  with_items: "{{ _acmesh_crt_type_list }}"
+  when:
+    - _acmesh_crt_dir_stat[item].exists
+  failed_when: >-
+    ('.conf' not in generics_in_dir) and ('.conf.removed' not in generics_in_dir)
+  ignore_errors: "{{ acmesh_ignore_cert_errors }}"
+  register: _result

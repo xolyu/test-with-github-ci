@@ -1,0 +1,28 @@
+---
+
+- name: Issue certificate.
+  become: true
+  become_user: "{{ acmesh_user }}"
+  command:
+    chdir: "{{ acmesh_user_home }}"
+    cmd: >-
+      {{ acmesh_cmd_base }} --issue
+      --webroot {{ acmesh_challange_dir }}
+      {{- _acmesh_crt.force | ternary(' --force', '') }}
+      {{- _acmesh_crt.test | ternary(' --test', '') }}
+      --post-hook {{ (acmesh_scripts_dir, 'certs-fix-permissions.sh') | path_join }}
+      {{- (' --server ' ~ _acmesh_crt.server) if _acmesh_crt.server is defined else '' }}
+      --keylength {{ item }}
+      {{ ['-d'] | product(_acmesh_crt.domains) | map('join', ' ') | join(' ') }}
+  vars:
+    type: "{{ item | regex_search('^ec-') is not none | ternary('ecc', 'rsa') }}"
+    generics_in_dir: "{{ _acmesh_crt_dir_content[type].generics }}"
+  with_items: "{{ _acmesh_crt_keylength_list }}"
+  when: >-
+    not _acmesh_crt_dir_stat[type].exists
+    or
+    _acmesh_crt.force
+    or
+    ( _acmesh_crt_dir_stat[type].exists and '.cer' not in generics_in_dir )
+  ignore_errors: "{{ acmesh_ignore_cert_errors }}"
+  register: _result

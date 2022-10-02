@@ -1,0 +1,22 @@
+---
+
+- name: Renew certificate.
+  become: true
+  become_user: "{{ acmesh_user }}"
+  command:
+    chdir: "{{ acmesh_user_home }}"
+    cmd: >-
+      {{ acmesh_cmd_base }} --renew
+      -d {{ _acmesh_crt.domains | first }}
+      {{- (item == 'ecc') | ternary(' --ecc', '') }}
+      {{- _acmesh_crt.force | ternary(' --force', '') }}
+  with_items: "{{ _acmesh_crt_type_list }}"
+  when:
+    - _acmesh_crt_dir_stat[item].exists
+  changed_when: >-
+    _result.stdout | regex_search('Skip, Next renewal time is:') is none
+  failed_when: >-
+    _result.rc > 0 and
+    _result.stdout | regex_search('Skip, Next renewal time is:') is none
+  ignore_errors: "{{ acmesh_ignore_cert_errors }}"
+  register: _result
