@@ -11,6 +11,12 @@
       when: ansible_os_family == "Debian"
       changed_when: false
 
+    - name: Update apt cache if needed.
+      apt:
+        name: bcron
+      when: ansible_os_family == "Debian"
+      changed_when: false
+
   roles:
     - role: xolyu.acmesh
       acmesh_ensure_requirements: yes
