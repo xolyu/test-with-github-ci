@@ -58,8 +58,15 @@
       --home {{ acmesh_install_root }}
       --config-home {{ (acmesh_install_root, _acmesh_config_dir) | path_join }}
 
-- name: Include install tasks.
-  include_tasks: 10_install.yml
+- name: Perform installation.
+  block:
+    - name: Include requirements tasks.
+      include_tasks: 05_requirements.yml
+      when: acmesh_ensure_requirements
+
+    - name: Include install tasks.
+      include_tasks: 10_install.yml
+
   when: not _acmesh_is_installed or acmesh_state == 'updated'
 
 - name: Query stat for acme.sh script.

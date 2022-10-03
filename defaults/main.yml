@@ -4,6 +4,7 @@
 acmesh_state: present  # present, updated
 acmesh_version: latest  # latest, <tag>, master
 acmesh_configure: on_install  # always, on_install
+acmesh_ensure_requirements: no
 
 acmesh_user: acmesh
 # acmesh_user_home: e.g. /usr/lib/acmesh
