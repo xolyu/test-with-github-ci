@@ -24,7 +24,7 @@ acmesh_default_chain:
   - server: letsencrypt
     chain: ISRG
 
-acmesh_cron_state: present  # present, absent
+acmesh_cron_state: present  # present, absent, ignored
 acmesh_cron_hour: '3'
 acmesh_cron_minute: '40'
 acmesh_cron_weekday: '0,3'

@@ -6,6 +6,7 @@
   roles:
     - role: xolyu.acmesh
       acmesh_ensure_requirements: no
+      acmesh_cron_state: ignored
 
   tasks:
     - name: "Query acme.sh --version."

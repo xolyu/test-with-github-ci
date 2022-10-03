@@ -55,6 +55,7 @@
     minute: "{{ acmesh_cron_minute | default('0', true) }}"
     weekday: "{{ acmesh_cron_weekday | default(omit, true) }}"
     day: "{{ acmesh_cron_day | default(omit, true) }}"
+  when: acmesh_cron_state != 'ignored'
 
 - name: Make Bash Aliases present.
   become: true
