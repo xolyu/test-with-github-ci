@@ -1,0 +1,45 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: "Query acme.sh --version."
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: "{{ acmesh_cmd_base }} --version"
+      changed_when: false
+      register: _test_acmesh_version
+    - debug: var=_test_acmesh_version
+
+    - name: "Assert acme.sh --version output."
+      assert:
+        that: "{{ item.test }}"
+      loop:
+        - name: Repository
+          test: "{{ _test_acmesh_version.stdout | regex_search('acmesh-official/acme\\.sh$') is not none }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Query acme.sh --info."
+      command:
+        chdir: "{{ acmesh_user_home }}"
+        cmd: "{{ acmesh_cmd_base }} --info"
+      changed_when: false
+      register: _test_acmesh_info
+    - debug: var=_test_acmesh_info
+
+    - name: "Assert acme.sh --info output."
+      assert:
+        that: "{{ item.test }}"
+      loop:
+        - name: Working directory
+          test: "{{ data['LE_WORKING_DIR'] | default('') == acmesh_install_root }}"
+        - name: Certificate directory
+          test: "{{ data['CERT_HOME'] | default('') == acmesh_cert_dir }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        qc: "['\"]?"
+        data: "{{ _test_acmesh_info.stdout | regex_findall('^(\\w+)='~qc~'(.*?)'~qc~'$', multiline=True)
+          | community.general.dict }}"
