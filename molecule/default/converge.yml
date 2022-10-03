@@ -11,10 +11,6 @@
       when: ansible_os_family == "Debian"
       changed_when: false
 
-    - setup:
-      register: setup_result
-    - debug: var=setup_result
-
   roles:
     - role: xolyu.acmesh
       acmesh_ensure_requirements: yes

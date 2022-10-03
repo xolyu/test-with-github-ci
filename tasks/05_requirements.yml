@@ -8,5 +8,8 @@
 
 - name: Ensure required packages are installed.
   package:
-    name: unzip
+    name: "{{ item }}"
     state: present
+  with_items:
+    - unzip
+    - curl
