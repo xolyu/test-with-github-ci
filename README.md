@@ -13,7 +13,10 @@ Calling the role with `acmesh_certs` variable set enables automated certificate 
 
 ## Requirements
 
-None.
+* Systempackage `unzip` for Ansibles [`unarchive` module](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/unarchive_module.html).
+* Systempackage `curl` for acme.sh to work, alternatively `wget`.
+
+_For automatic ensuring of the packages, see variable `acmesh_ensure_requirements`._
 
 
 ## Role Variables
@@ -33,6 +36,11 @@ None.
   Allows to limit the frequency of configuration. While `always` runs the configuration every time the role is executed, `on_install` allows the configuration to stop when the role is executed but the application is already installed. The `on_install` setting is useful when the role is executed to issue certificates or disable renewal.  
   Choices: `always`, `on_install`  
   Default: `on_install`
+
+* **`acmesh_ensure_requirements`**  
+  Provides for the installation of the packages listed under requirements.  
+  Type: bool  
+  Default: `no`
 
 * **`acmesh_user`**  
   The user for executing acme.sh.  

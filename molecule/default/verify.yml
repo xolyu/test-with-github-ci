@@ -21,7 +21,8 @@
         that: "{{ item.test }}"
       loop:
         - name: Repository
-          test: "{{ _test_acmesh_version.stdout | regex_search('acmesh-official/acme\\.sh$') is not none }}"
+          test: "{{ _test_acmesh_version.stdout
+            | regex_search('acmesh-official/acme\\.sh$', multiline=True) is not none }}"
       loop_control:
         label: "{{ item.name }}"
 
