@@ -9,9 +9,9 @@ name: CI
   # schedule:
   #   - cron: "0 7 * * 2"
 
-defaults:
-  run:
-    working-directory: 'xolyu.acmesh'
+# defaults:
+#   run:
+#     working-directory: 'xolyu.acmesh'
 
 jobs:
 
@@ -20,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase.
-        uses: actions/checkout@v2
-        with:
-          path: 'xolyu.acmesh'
+        uses: actions/checkout@v3
+        # with:
+        #   path: 'xolyu.acmesh'
 
       - name: Set up Python 3.
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
@@ -53,12 +53,12 @@ jobs:
 
     steps:
       - name: Check out the codebase.
-        uses: actions/checkout@v2
-        with:
-          path: 'xolyu.acmesh'
+        uses: actions/checkout@v3
+        # with:
+        #   path: 'xolyu.acmesh'
 
       - name: Set up Python 3.
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
