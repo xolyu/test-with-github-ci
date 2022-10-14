@@ -22,4 +22,4 @@
   roles:
     - role: xolyu.acmesh
       acmesh_ensure_requirements: yes
-      acmesh_cron_state: ignored
+      # acmesh_cron_state: ignored
